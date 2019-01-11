@@ -11,6 +11,11 @@ class BaseArea : public CDialog
 public:
 	BaseArea(CWnd* pParent = NULL);   // 标准构造函数
 	virtual ~BaseArea();
+	CDatabase m_database;
+
+
+
+	std::vector<CString>m_FieldName;
 
 
 	void GetAllFormatFiles( std::string path, std::vector<std::string>& files,std::string format);

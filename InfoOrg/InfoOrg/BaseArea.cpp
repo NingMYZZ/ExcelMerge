@@ -44,7 +44,6 @@ END_MESSAGE_MAP()
 void BaseArea::CreaTable(CString sFile,std::vector<CString>&FieldName)
 {
 
-	CDatabase database_w;
 	CString sDriver="MICROSOFT EXCEL DRIVER (*.XLS)";
 
 
@@ -52,7 +51,7 @@ void BaseArea::CreaTable(CString sFile,std::vector<CString>&FieldName)
 	TRY 
 	{	
 		sSQL.Format("DRIVER={%s};DSN='';FIRSTROWHASNAMES=1;READONLY=FALSE;CREATE_DB=\"%s\";DBQ=%s",sDriver, sFile,sFile);
-		if( database_w.OpenEx(sSQL,CDatabase::noOdbcDialog) )
+		if( m_database.OpenEx(sSQL,CDatabase::noOdbcDialog) )
 		{
 			sSQL="CREATE TABLE Sheet1(";
 
@@ -62,9 +61,13 @@ void BaseArea::CreaTable(CString sFile,std::vector<CString>&FieldName)
 			}
 
 			sSQL=sSQL+FieldName[FieldName.size()-1]+" TEXT "+" )";
-			database_w.ExecuteSQL(sSQL);
+			m_database.ExecuteSQL(sSQL);
 		}
-		database_w.Close();
+
+
+
+
+		/*m_database.Close();*/
 
 	}
 	CATCH (CMemoryException, e)
@@ -81,17 +84,26 @@ void BaseArea::CreaTable(CString sFile,std::vector<CString>&FieldName)
 void BaseArea::OnBnClickedOk()
 {
 	UpdateData(TRUE);
+
+	if(FileName==_T("") || resFilePath==_T("")) 
+	{
+		AfxMessageBox("请输入值");
+		return;
+	}
+
 	vector<string>FileNameFolder;
+
+	CString sExceFile =this->FilePath+"\\"+this->FileName+".xls";
+	this->resFilePath=sExceFile;
+	CString sSQL;
+
+	remove(sExceFile);
 
 	this->GetAllFormatFiles((LPCTSTR)(this->FilePath) ,FileNameFolder,".xls");
 	vector<CString> item;
 
 	CString buf=FileNameFolder[0].c_str();
 	this->ReadExcelField(buf,item);     //(CString)FileNameFolder.at(0).c_str()    "C://Users//2018YZZ//Desktop//班级信息//毕业本科生信息报表-贾孝良.xls"
-
-	CString sExceFile =this->FilePath+"\\"+this->FileName+".xls";
-	this->resFilePath=sExceFile;
-	CString sSQL;
 
 
 	this->CreaTable(sExceFile,item);
@@ -100,14 +112,14 @@ void BaseArea::OnBnClickedOk()
 	{
 		vector<CString> databuf;
 		buf=FileNameFolder[i].c_str();
+	
 		this->ReadExcel(buf,databuf);
-		this->WriteExcel(sExceFile,databuf);
+		if(!databuf.empty())
+			this->WriteExcel(sExceFile,databuf);
 	}
 
 
-
-
-
+	m_database.Close();
 
 	// TODO: 在此添加控件通知处理程序代码
 	OnOK();
@@ -156,7 +168,7 @@ void BaseArea::ReadExcelField(CString sFile,std::vector<CString>&FieldName)
 			FieldName.push_back(buffer.m_strName);
 		}
 
-
+		m_FieldName=FieldName;
 		// 关闭数据库
 		database.Close();
 
@@ -205,8 +217,12 @@ void BaseArea::ReadExcel(CString sFile,vector<CString> &sItem)
 
 		sSql = sSql+ "SELECT *  FROM  [Sheet1$] ";
 
-		// 执行查询语句
-		recset.Open(CRecordset::forwardOnly, sSql, CRecordset::readOnly);
+		// 执行查询语句,如果失败返回
+		if (recset.Open(CRecordset::forwardOnly, sSql, CRecordset::readOnly))
+		{
+			return;
+		}
+		
 		
 		//database.ExecuteSQL(sSql);
 
@@ -230,7 +246,7 @@ void BaseArea::ReadExcel(CString sFile,vector<CString> &sItem)
 	CATCH(CDBException, e)
 	{
 		// 数据库操作产生异常时...
-		AfxMessageBox("数据库错误: " + e->m_strError);
+		/*AfxMessageBox("数据库错误: " + e->m_strError);*/
 	}
 	END_CATCH;
 }
@@ -242,7 +258,6 @@ void BaseArea::ReadExcel(CString sFile,vector<CString> &sItem)
 void BaseArea::WriteExcel(CString sFile,vector<CString> sItem)
 {
 
-	CDatabase database;
 	CString sDriver = "Microsoft Excel Driver (*.xls)"; // Excel安装驱动
 	CString sSql;
 
@@ -259,23 +274,27 @@ void BaseArea::WriteExcel(CString sFile,vector<CString> sItem)
 		// 创建进行存取的字符串
 		sSql.Format("DRIVER={%s};DSN='';FIRSTROWHASNAMES=1;READONLY=FALSE;CREATE_DB=\"%s\";DBQ=%s",sDriver, sFile, sFile);
 
-		// 创建数据库 (既Excel表格文件)
-		if (database.OpenEx(sSql,CDatabase::noOdbcDialog))
+	
+
+		sSql="";
+		sSql =sSql+ " INSERT INTO " +"Sheet1" +" VALUES(";
+		for (int i=0;i<sItem.size()-1;++i)
 		{
-			sSql="";
-			sSql =sSql+ " INSERT INTO " +"Sheet1" +" VALUES(";
-			for (int i=0;i<sItem.size()-1;++i)
-			{
-				sSql+=	sItem[i]+", " ;
-			}
+			if (sItem[i]=="") sItem[i]=" ";
 
-			sSql=sSql+sItem[sItem.size()-1]+")";
-			database.ExecuteSQL(sSql);
+			sItem[i]="'"+sItem[i]+"'";
 
+			sSql+=	sItem[i]+", " ;
 		}
 
+		sItem[sItem.size()-1]="'"+sItem[sItem.size()-1]+"'";
+		sSql=sSql+sItem[sItem.size()-1]+")";
+		m_database.ExecuteSQL(sSql);
+
+	
+
 		// 关闭数据库
-		database.Close();
+		/*m_database.Close();*/
 	}
 	CATCH_ALL(e)
 	{
